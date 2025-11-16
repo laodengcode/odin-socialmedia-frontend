@@ -56,6 +56,11 @@ const validator = {
     if (value.length > max) return `${fieldName} must be less than ${max} characters`;
     return null;
   },
+  email: (value) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(value)) return 'Please enter a valid email address';
+    return null;
+  },
   username: (value) => {
     if (!/^[a-zA-Z0-9_]{3,20}$/.test(value)) {
       return 'Username must be 3-20 characters (letters, numbers, underscore only)';
@@ -97,10 +102,10 @@ const AuthProvider = ({ children }) => {
     return data;
   };
 
-  const signup = async (username, password, name) => {
-    const data = await api.fetch('/auth/signup', {
+  const signup = async (username, email, password, name) => {
+    const data = await api.fetch('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ username, password, name }),
+      body: JSON.stringify({ username, email, password, name }),
     });
     setUser(data.user);
     return data;
@@ -121,7 +126,7 @@ const AuthProvider = ({ children }) => {
 // Sign In Page
 const SignInPage = () => {
   const [mode, setMode] = useState('login');
-  const [formData, setFormData] = useState({ username: '', password: '', name: '' });
+  const [formData, setFormData] = useState({ username: '', email: '', password: '', name: '' });
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -139,6 +144,9 @@ const SignInPage = () => {
     if (mode === 'signup') {
       const nameError = validator.required(formData.name, 'Name');
       if (nameError) newErrors.name = nameError;
+      
+      const emailError = validator.required(formData.email, 'Email') || validator.email(formData.email);
+      if (emailError) newErrors.email = emailError;
     }
     
     setErrors(newErrors);
@@ -156,7 +164,7 @@ const SignInPage = () => {
       if (mode === 'login') {
         await login(formData.username, formData.password);
       } else {
-        await signup(formData.username, formData.password, formData.name);
+        await signup(formData.username, formData.email, formData.password, formData.name);
       }
     } catch (err) {
       setApiError(err.message);
@@ -200,16 +208,29 @@ const SignInPage = () => {
             </div>
 
             {mode === 'signup' && (
-              <div className="form-group">
-                <label>Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className={errors.name ? 'error' : ''}
-                />
-                {errors.name && <span className="field-error">{errors.name}</span>}
-              </div>
+              <>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className={errors.email ? 'error' : ''}
+                  />
+                  {errors.email && <span className="field-error">{errors.email}</span>}
+                </div>
+                
+                <div className="form-group">
+                  <label>Name</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className={errors.name ? 'error' : ''}
+                  />
+                  {errors.name && <span className="field-error">{errors.name}</span>}
+                </div>
+              </>
             )}
 
             <div className="form-group">
