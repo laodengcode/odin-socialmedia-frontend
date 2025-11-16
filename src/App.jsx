@@ -94,10 +94,12 @@ const AuthProvider = ({ children }) => {
   };
 
   const login = async (username, password) => {
+    console.log('Attempting login with:', { username, password: '***' });
     const data = await api.fetch('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     });
+    console.log('Login successful:', data);
     setUser(data.user);
     return data;
   };
@@ -291,7 +293,7 @@ const Post = ({ post, onUpdate }) => {
   const [comment, setComment] = useState('');
   const [showComments, setShowComments] = useState(false);
 
-  const isLiked = post.likes?.some(like => like.user.id === user.id);
+  const isLiked = post.likes?.some(like => like.user?.id === user.id || like.userId === user.id);
 
   const handleLike = async () => {
     try {
@@ -326,13 +328,13 @@ const Post = ({ post, onUpdate }) => {
     <div className="post-card">
       <div className="post-header">
         <img 
-          src={post.author.imageUrl || `https://ui-avatars.com/api/?name=${post.author.name}&background=random`} 
-          alt={post.author.name}
+          src={post.author?.imageUrl || `https://ui-avatars.com/api/?name=${post.author?.name || 'User'}&background=random`} 
+          alt={post.author?.name || 'User'}
           className="avatar-small"
         />
         <div>
-          <div className="post-author">{post.author.name}</div>
-          <div className="post-meta">@{post.author.username}</div>
+          <div className="post-author">{post.author?.name || 'Unknown User'}</div>
+          <div className="post-meta">@{post.author?.username || 'unknown'}</div>
         </div>
       </div>
       
@@ -353,12 +355,12 @@ const Post = ({ post, onUpdate }) => {
           {post.comments?.map(c => (
             <div key={c.id} className="comment">
               <img 
-                src={c.author.imageUrl || `https://ui-avatars.com/api/?name=${c.author.username}&background=random`}
-                alt={c.author.username}
+                src={c.author?.imageUrl || `https://ui-avatars.com/api/?name=${c.author?.username || 'User'}&background=random`}
+                alt={c.author?.username || 'User'}
                 className="avatar-tiny"
               />
               <div className="comment-content">
-                <strong>@{c.author.username}</strong>
+                <strong>@{c.author?.username || 'unknown'}</strong>
                 <p>{c.content}</p>
               </div>
             </div>
