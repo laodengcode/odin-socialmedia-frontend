@@ -264,6 +264,23 @@ const SignInPage = () => {
 const Navigation = () => {
   const { user, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState('feed');
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    loadPendingCount();
+    // Refresh count every 30 seconds
+    const interval = setInterval(loadPendingCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadPendingCount = async () => {
+    try {
+      const data = await api.fetch('/follows/received');
+      setPendingCount(data.follows?.length || 0);
+    } catch (err) {
+      console.error('Failed to load pending count:', err);
+    }
+  };
 
   return (
     <>
@@ -273,6 +290,10 @@ const Navigation = () => {
           <div className="nav-links">
             <button onClick={() => setCurrentPage('feed')} className={currentPage === 'feed' ? 'active' : ''}>Feed</button>
             <button onClick={() => setCurrentPage('users')} className={currentPage === 'users' ? 'active' : ''}>Users</button>
+            <button onClick={() => { setCurrentPage('requests'); loadPendingCount(); }} className={`${currentPage === 'requests' ? 'active' : ''} nav-btn-with-badge`}>
+              Requests
+              {pendingCount > 0 && <span className="badge">{pendingCount}</span>}
+            </button>
             <button onClick={() => setCurrentPage('profile')} className={currentPage === 'profile' ? 'active' : ''}>Profile</button>
             <button onClick={logout} className="btn-logout">Logout</button>
           </div>
@@ -281,6 +302,7 @@ const Navigation = () => {
       <div className="main-content">
         {currentPage === 'feed' && <FeedPage />}
         {currentPage === 'users' && <UsersPage />}
+        {currentPage === 'requests' && <FollowRequestsPage onUpdate={loadPendingCount} />}
         {currentPage === 'profile' && <ProfilePage userId={user.id} />}
       </div>
     </>
@@ -495,6 +517,136 @@ const UsersPage = () => {
             </button>
           </div>
         ))}
+      </div>
+    </div>
+  );
+};
+
+// Follow Requests Page
+const FollowRequestsPage = () => {
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [sentRequests, setSentRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadRequests();
+  }, []);
+
+  const loadRequests = async () => {
+    setLoading(true);
+    try {
+      // Get all follow relationships
+      const [receivedRes, sentRes] = await Promise.all([
+        api.fetch('/follows/received'),
+        api.fetch('/follows/sent')
+      ]);
+      
+      setPendingRequests(receivedRes.follows || []);
+      setSentRequests(sentRes.follows || []);
+    } catch (err) {
+      console.error('Failed to load requests:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAccept = async (followId) => {
+    try {
+      await api.fetch(`/follows/${followId}/accept`, { method: 'PATCH' });
+      await loadRequests();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleReject = async (followId) => {
+    try {
+      await api.fetch(`/follows/${followId}`, { method: 'DELETE' });
+      await loadRequests();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  const handleCancelRequest = async (followId) => {
+    try {
+      await api.fetch(`/follows/${followId}`, { method: 'DELETE' });
+      await loadRequests();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  if (loading) {
+    return <div className="page-container"><div className="loading">Loading...</div></div>;
+  }
+
+  return (
+    <div className="page-container">
+      <h2>Follow Requests</h2>
+      
+      <div className="requests-section">
+        <h3>Pending Requests ({pendingRequests.length})</h3>
+        {pendingRequests.length === 0 ? (
+          <div className="empty-state">No pending requests</div>
+        ) : (
+          <div className="requests-list">
+            {pendingRequests.map(follow => (
+              <div key={follow.id} className="request-card">
+                <img 
+                  src={follow.follower?.imageUrl || `https://ui-avatars.com/api/?name=${follow.follower?.name || 'User'}&background=random`}
+                  alt={follow.follower?.name || 'User'}
+                  className="avatar-small"
+                />
+                <div className="request-info">
+                  <strong>{follow.follower?.name || 'Unknown'}</strong>
+                  <p className="request-username">@{follow.follower?.username || 'unknown'}</p>
+                </div>
+                <div className="request-actions">
+                  <button onClick={() => handleAccept(follow.id)} className="btn-accept">
+                    Accept
+                  </button>
+                  <button onClick={() => handleReject(follow.id)} className="btn-reject">
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="requests-section">
+        <h3>Sent Requests ({sentRequests.length})</h3>
+        {sentRequests.length === 0 ? (
+          <div className="empty-state">No sent requests</div>
+        ) : (
+          <div className="requests-list">
+            {sentRequests.map(follow => (
+              <div key={follow.id} className="request-card">
+                <img 
+                  src={follow.following?.imageUrl || `https://ui-avatars.com/api/?name=${follow.following?.name || 'User'}&background=random`}
+                  alt={follow.following?.name || 'User'}
+                  className="avatar-small"
+                />
+                <div className="request-info">
+                  <strong>{follow.following?.name || 'Unknown'}</strong>
+                  <p className="request-username">@{follow.following?.username || 'unknown'}</p>
+                  <span className={`status-badge ${follow.status.toLowerCase()}`}>
+                    {follow.status}
+                  </span>
+                </div>
+                {follow.status === 'PENDING' && (
+                  <div className="request-actions">
+                    <button onClick={() => handleCancelRequest(follow.id)} className="btn-cancel">
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
